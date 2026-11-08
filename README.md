@@ -563,6 +563,10 @@ Topics covered:
 - Area-based object filtering
 - Automotive ADAS applications
 
+
+- <img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/e5c0cec6-50ce-4864-a5ef-d646a3e8d461" />
+
+
 **Next Lesson: Lesson 10 – Image Segmentation using Thresholding and Adaptive Thresholding.**
 
 ---
