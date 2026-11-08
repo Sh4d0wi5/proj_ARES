@@ -150,3 +150,422 @@ Natural next steps for the project:
 ## License
 
 No license has been specified yet. Consider adding one (e.g. MIT) if you want others to reuse the code.
+
+
+##################################################################### LESSON 09 #######################################################################################
+
+# ARES – Lesson 09
+# Connected Components Analysis (OpenCV)
+
+## 1. Learning Objectives
+
+By the end of this lesson, we will understand:
+
+1. Binary image creation.
+2. Connected Components Analysis.
+3. Component labelling.
+4. Extracting object properties.
+5. Bounding boxes and centroids.
+6. Area-based object filtering.
+7. Applications in automotive ADAS and computer vision.
+
+---
+
+## 2. Understanding Binary Images
+
+A binary image contains only two pixel values:
+
+- 0 – Black
+- 255 – White
+
+In this lesson, we create an image containing three separate white objects against a black background.
+
+### Python Code
+
+```python
+image = np.zeros((400, 600), dtype=np.uint8)
+
+cv2.rectangle(image, (50, 50), (150, 150), 255, -1)
+cv2.circle(image, (300, 100), 50, 255, -1)
+cv2.rectangle(image, (400, 200), (550, 350), 255, -1)
+```
+
+### Explanation
+
+- `np.zeros()` creates a black image.
+- `cv2.rectangle()` draws rectangular objects.
+- `cv2.circle()` draws a circular object.
+- `255` represents white.
+- `-1` fills the complete shape.
+
+**Observation:** The image contains three separate foreground objects.
+
+---
+
+## 3. Connected Components Analysis
+
+Connected Components Analysis identifies separate connected regions in a binary image.
+
+OpenCV groups neighbouring foreground pixels and assigns a unique label to each connected region.
+
+### Python Code
+
+```python
+num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(image)
+```
+
+### Four Returned Values
+
+| Variable | Description |
+|---|---|
+| num_labels | Total number of labels, including background |
+| labels | Label assigned to every pixel |
+| stats | Measurements of each component |
+| centroids | Centre coordinates of each component |
+
+### Understanding Labels
+
+Expected output:
+
+```text
+Number of labels: 4
+Unique labels: [0 1 2 3]
+```
+
+| Label | Description |
+|---|---|
+| 0 | Background |
+| 1 | First rectangle |
+| 2 | Circle |
+| 3 | Second rectangle |
+
+Why four labels?
+
+Because OpenCV also considers the background as a component.
+
+**Connectivity:** OpenCV uses 8-connectivity by default. Horizontal, vertical and diagonal neighbouring foreground pixels can belong to the same component.
+
+---
+
+## 4. Visualizing Component Labels
+
+### Python Code
+
+```python
+label_image = (labels * 80).astype(np.uint8)
+
+plt.imshow(label_image, cmap='nipy_spectral')
+plt.title("Connected Components - Labels")
+plt.axis("off")
+plt.show()
+```
+
+### Explanation
+
+The labels array contains integer values representing individual components.
+
+Multiplying by 80 makes the label values easier to distinguish visually.
+
+| Original Label | Visualization Value |
+|---|---|
+| 0 | 0 |
+| 1 | 80 |
+| 2 | 160 |
+| 3 | 240 |
+
+The colour map converts these values into different displayed colours.
+
+**Important:** Colours are only for visualization. The actual labels remain 0, 1, 2 and 3.
+
+### Checking Individual Labels
+
+```python
+print("Unique labels:", np.unique(labels))
+
+print("Label at object 1:", labels[100, 100])
+print("Label at object 2:", labels[100, 300])
+print("Label at object 3:", labels[250, 450])
+```
+
+Expected output:
+
+```text
+Unique labels: [0 1 2 3]
+Label at object 1: 1
+Label at object 2: 2
+Label at object 3: 3
+```
+
+**Important:** NumPy image indexing follows `[y, x]`, whereas OpenCV drawing coordinates use `(x, y)`.
+
+---
+
+## 5. Extracting Object Properties
+
+Connected Components provides useful measurements for every detected object.
+
+The `stats` array contains:
+
+| Property | OpenCV Constant | Description |
+|---|---|---|
+| X | CC_STAT_LEFT | Left starting coordinate |
+| Y | CC_STAT_TOP | Top starting coordinate |
+| Width | CC_STAT_WIDTH | Bounding box width |
+| Height | CC_STAT_HEIGHT | Bounding box height |
+| Area | CC_STAT_AREA | Number of foreground pixels |
+
+The centroid contains the geometric centre coordinates.
+
+### Python Code
+
+```python
+for i in range(1, num_labels):
+
+    x = stats[i, cv2.CC_STAT_LEFT]
+    y = stats[i, cv2.CC_STAT_TOP]
+
+    w = stats[i, cv2.CC_STAT_WIDTH]
+    h = stats[i, cv2.CC_STAT_HEIGHT]
+
+    area = stats[i, cv2.CC_STAT_AREA]
+
+    cx, cy = centroids[i]
+
+    print(f"\nObject {i}")
+    print("X:", x)
+    print("Y:", y)
+    print("Width:", w)
+    print("Height:", h)
+    print("Area:", area)
+    print("Centroid:", cx, cy)
+```
+
+We start the loop from 1 because label 0 represents the background.
+
+### Expected Results
+
+| Object | X | Y | Width | Height | Area |
+|---|---:|---:|---:|---:|---:|
+| Rectangle 1 | 50 | 50 | 101 | 101 | 10,201 |
+| Circle | 250 | 50 | 101 | 101 | 7,845 |
+| Rectangle 2 | 400 | 200 | 151 | 151 | 22,801 |
+
+### Important Observation
+
+The circle and first rectangle have identical bounding box dimensions, but different areas.
+
+This demonstrates that bounding box dimensions alone cannot describe the actual shape of an object.
+
+---
+
+## 6. Understanding Centroids
+
+A centroid represents the geometric centre of a connected component.
+
+For example:
+
+- Rectangle 1: (100, 100)
+- Circle: (300, 100)
+- Rectangle 2: (475, 275)
+
+Centroids help determine the approximate position of detected objects.
+
+They are useful in object tracking, positioning and image analysis.
+
+---
+
+## 7. Drawing Bounding Boxes and Centroids
+
+We can visualize the detected objects by drawing:
+
+- Green rectangle – Bounding box
+- Red dot – Centroid
+- Blue text – Object ID
+
+### Python Code
+
+```python
+output = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+
+for i in range(1, num_labels):
+
+    x = stats[i, cv2.CC_STAT_LEFT]
+    y = stats[i, cv2.CC_STAT_TOP]
+
+    w = stats[i, cv2.CC_STAT_WIDTH]
+    h = stats[i, cv2.CC_STAT_HEIGHT]
+
+    cx, cy = centroids[i]
+
+    cv2.rectangle(
+        output,
+        (x, y),
+        (x+w, y+h),
+        (0, 255, 0),
+        2
+    )
+
+    cv2.circle(
+        output,
+        (int(cx), int(cy)),
+        5,
+        (0, 0, 255),
+        -1
+    )
+
+    cv2.putText(
+        output,
+        f"Object {i}",
+        (x, y-10),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.6,
+        (255, 0, 0),
+        2
+    )
+
+plt.figure(figsize=(10, 6))
+plt.imshow(cv2.cvtColor(output, cv2.COLOR_BGR2RGB))
+plt.title("Connected Components - Object Detection")
+plt.axis("off")
+plt.show()
+```
+
+**Note:** We convert the grayscale image into BGR so that coloured annotations can be drawn.
+
+---
+
+## 8. Area-Based Object Filtering
+
+In practical computer vision, images may contain unwanted small regions or noise.
+
+We can filter detected components using their area.
+
+### Python Code
+
+```python
+output = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+
+min_area = 8000
+
+for i in range(1, num_labels):
+
+    area = stats[i, cv2.CC_STAT_AREA]
+
+    if area > min_area:
+
+        x = stats[i, cv2.CC_STAT_LEFT]
+        y = stats[i, cv2.CC_STAT_TOP]
+
+        w = stats[i, cv2.CC_STAT_WIDTH]
+        h = stats[i, cv2.CC_STAT_HEIGHT]
+
+        cx, cy = centroids[i]
+
+        cv2.rectangle(
+            output,
+            (x, y),
+            (x+w, y+h),
+            (0, 255, 0),
+            2
+        )
+
+        cv2.circle(
+            output,
+            (int(cx), int(cy)),
+            5,
+            (0, 0, 255),
+            -1
+        )
+
+        print(f"Object {i} detected | Area: {area}")
+
+plt.imshow(cv2.cvtColor(output, cv2.COLOR_BGR2RGB))
+plt.title("Area-Based Object Filtering")
+plt.axis("off")
+plt.show()
+```
+
+### Expected Results
+
+Minimum area = 8,000 pixels.
+
+| Object | Area | Result |
+|---|---:|---|
+| Rectangle 1 | 10,201 | Detected |
+| Circle | 7,845 | Filtered |
+| Rectangle 2 | 22,801 | Detected |
+
+Only two objects should have bounding boxes.
+
+**Concept:** Area-based filtering removes components that do not meet the specified minimum area.
+
+---
+
+## 9. Automotive ADAS Applications
+
+Connected Components Analysis can be useful in several computer vision applications.
+
+### 9.1 Parking Assistance
+Identifying separate foreground regions in thresholded obstacle images.
+
+### 9.2 Road Segmentation
+Separating connected regions of road markings and other foreground features.
+
+### 9.3 Noise Removal
+Removing small unwanted regions from binary images.
+
+### 9.4 Autonomous Drone Landing
+Identifying separate candidate landing regions and calculating their centres.
+
+**Limitation:** Connected Components does not understand object identity. It only groups connected foreground pixels. Actual vehicle and pedestrian recognition requires more advanced methods such as YOLO and semantic segmentation.
+
+---
+
+## 10. Important Concepts to Remember
+
+| Concept | Purpose |
+|---|---|
+| Binary Image | Separates foreground and background |
+| Connected Components | Identifies separate connected regions |
+| Labels | Assigns IDs to individual components |
+| Stats | Extracts object measurements |
+| Centroid | Finds the geometric centre |
+| Bounding Box | Defines object boundaries |
+| Area Filtering | Selects objects based on pixel area |
+
+---
+
+## 11. Knowledge Check
+
+1. If an image contains five separate white objects, how many labels will OpenCV return?
+   - Answer: 6, including background.
+
+2. What does `CC_STAT_AREA` calculate?
+   - Answer: Number of foreground pixels in the component.
+
+3. What happens when two objects touch diagonally under default 8-connectivity?
+   - Answer: They may be considered one connected component.
+
+---
+
+## 12. Lesson Completion
+
+**ARES – Lesson 09: Connected Components Analysis**
+
+Topics covered:
+
+- Binary image creation
+- Connected component labelling
+- Understanding the labels array
+- Extracting object statistics
+- Calculating centroids
+- Drawing bounding boxes
+- Area-based object filtering
+- Automotive ADAS applications
+
+**Next Lesson: Lesson 10 – Image Segmentation using Thresholding and Adaptive Thresholding.**
+
+---
+
+*Project: ARES – Autonomous Robotics and Embedded Systems*  
+*Technology: Python, OpenCV, NumPy and Matplotlib*
